@@ -122,6 +122,51 @@
         }
         #send:disabled { opacity: 0.5; cursor: default; }
         #error { color: #f87171; padding: 0 20px 10px; min-height: 18px; font-size: 13px; }
+        #diagram-btn {
+            padding: 0 16px;
+            border: none;
+            border-radius: 8px;
+            background: var(--panel-2);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        #diagram-btn:hover {
+            background: var(--accent);
+        }
+
+        #diagram-btn:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
+        #diagram {
+            height: 300px;
+            margin: 10px 20px;
+            padding: 20px;
+            background: var(--panel);
+            border-radius: 12px;
+            overflow: auto;
+        }
+
+        #diagram svg {
+            max-width: 100%;
+        }
+        .msg.assistant:has(svg) {
+            max-width: 95%;
+            width: 95%;
+        }
+
+        .msg.assistant svg {
+            width: 100%;
+            height: auto;
+            min-height: 500px;
+        }
+
+        .msg.assistant:has(svg) div {
+            overflow-x: auto;
+        }
     </style>
 </head>
 <body>
@@ -132,13 +177,34 @@
 </aside>
 <main>
     <header id="chat-title">Select or start a chat</header>
-    <div id="chatMessages"><div class="empty">No conversation selected.</div></div>
+    <div id="chatMessages">
+        <div class="empty">No conversation selected.</div>
+    </div>
+
     <div id="error"></div>
     <form id="composer">
-        <textarea id="input" rows="2" placeholder="Type a chatMessage and press Enter..." disabled></textarea>
-        <button id="send" type="submit" disabled>Send</button>
+
+    <textarea
+            id="input"
+            rows="2"
+            placeholder="Type a chatMessage and press Enter..."
+            disabled>
+    </textarea>
+
+        <button id="diagram-btn" type="button" disabled>
+            Diagram
+        </button>
+
+        <button
+                id="send"
+                type="submit"
+                disabled>
+            Send
+        </button>
+
     </form>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 <script src="/app.js?v=chatMessages"></script>
 </body>
 </html>

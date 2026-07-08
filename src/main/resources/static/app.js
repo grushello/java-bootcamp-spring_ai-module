@@ -13,6 +13,19 @@ const api = {
             throw new Error(problem.detail || 'Request failed');
         }
         return r.json();
+    }),
+    diagram: (chatId, text) => fetch(`/api/chats/${chatId}/diagram`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "text/plain"
+        },
+        body: text
+    }).then(async r => {
+        if (!r.ok) {
+            const problem = await r.json().catch(() => ({}));
+            throw new Error(problem.detail || "Request failed");
+        }
+        return r.json();
     })
 };
 
@@ -24,10 +37,16 @@ const els = {
     send: document.getElementById('send'),
     form: document.getElementById('composer'),
     error: document.getElementById('error'),
-    newChat: document.getElementById('new-chat')
+    newChat: document.getElementById('new-chat'),
+    diagramButton: document.getElementById('diagram-btn')
 };
 
 let activeChatId = null;
+
+mermaid.initialize({
+    startOnLoad: false,
+    theme: "dark"
+});
 
 function setError(message) {
     els.error.textContent = message || '';
@@ -36,11 +55,17 @@ function setError(message) {
 function setComposerEnabled(enabled) {
     els.input.disabled = !enabled;
     els.send.disabled = !enabled;
+    els.diagramButton.disabled = !enabled;
 }
 
 async function refreshChatList() {
     const chats = await api.list();
+
+    console.log(chats);
+    console.log(Array.isArray(chats));
+
     els.chatList.innerHTML = '';
+
     chats.forEach(chat => els.chatList.appendChild(renderChatItem(chat)));
 }
 
@@ -78,13 +103,33 @@ function renderMessages(chat) {
 }
 
 function renderMessage(message) {
-    const wrapper = document.createElement('div');
+    console.log("Rendering", message);
+
+    const wrapper = document.createElement("div");
     wrapper.className = `msg ${message.role.toLowerCase()}`;
-    const role = document.createElement('div');
-    role.className = 'role';
+
+    const role = document.createElement("div");
+    role.className = "role";
     role.textContent = message.role;
-    const body = document.createElement('div');
-    body.textContent = message.content;
+
+    const body = document.createElement("div");
+
+    if (message.type === "MERMAID") {
+
+        mermaid.render(
+            "diagram-" + message.id,
+            message.content
+        ).then(result => {
+            body.innerHTML = result.svg;
+        }).catch(err => {
+            console.error(err);
+            body.textContent = message.content;
+        });
+
+    } else {
+        body.textContent = message.content;
+    }
+
     wrapper.append(role, body);
     return wrapper;
 }
@@ -138,11 +183,43 @@ async function submitMessage(content) {
 
 function appendPending(content) {
     els.messages.querySelector('.empty')?.remove();
-    els.messages.appendChild(renderMessage({ role: 'USER', content }));
-    const thinking = renderMessage({ role: 'ASSISTANT', content: '…' });
+    els.messages.appendChild(renderMessage({
+        role: "USER",
+        type: "TEXT",
+        content
+    }));
+    const thinking = renderMessage({
+        role: "ASSISTANT",
+        type: "TEXT",
+        content: "…"
+    });
     thinking.classList.add('pending');
     els.messages.appendChild(thinking);
     els.messages.scrollTop = els.messages.scrollHeight;
+}
+
+async function generateDiagram() {
+
+    const text = els.input.value.trim();
+
+    if (!text) {
+        setError("Enter a description first");
+        return;
+    }
+
+    try {
+        els.diagramButton.disabled = true;
+
+        const chat = await api.diagram(activeChatId, text);
+
+        renderMessages(chat);
+        await refreshChatList();
+
+    } catch (err) {
+        setError(err.message);
+    } finally {
+        els.diagramButton.disabled = false;
+    }
 }
 
 els.newChat.onclick = startNewChat;
@@ -161,5 +238,7 @@ els.input.addEventListener('keydown', (e) => {
         els.form.requestSubmit();
     }
 });
+
+els.diagramButton.onclick = generateDiagram;
 
 refreshChatList();

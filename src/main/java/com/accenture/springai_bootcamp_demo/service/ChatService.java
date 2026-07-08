@@ -1,12 +1,13 @@
 package com.accenture.springai_bootcamp_demo.service;
 
-import com.accenture.springai_bootcamp_demo.client.OpenRouterClient;
+import com.accenture.springai_bootcamp_demo.client.OllamaClient;
 import com.accenture.springai_bootcamp_demo.dto.ChatDto;
 import com.accenture.springai_bootcamp_demo.dto.ChatSummaryDto;
 import com.accenture.springai_bootcamp_demo.dto.CreateChatRequest;
 import com.accenture.springai_bootcamp_demo.dto.SendMessageRequest;
 import com.accenture.springai_bootcamp_demo.entity.Chat;
 import com.accenture.springai_bootcamp_demo.entity.ChatMessage;
+import com.accenture.springai_bootcamp_demo.entity.MessageType;
 import com.accenture.springai_bootcamp_demo.entity.Role;
 import com.accenture.springai_bootcamp_demo.mapper.ChatMapper;
 import com.accenture.springai_bootcamp_demo.repository.ChatRepository;
@@ -27,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AllArgsConstructor
 public class ChatService {
     private final ChatRepository chatRepository;
-    private final OpenRouterClient openRouterClient;
+    private final OllamaClient ollamaClient;
     private final ChatMapper chatMapper;
 
     @Transactional
@@ -66,13 +67,34 @@ public class ChatService {
         Chat chat = loadChat(chatId);
 
         recordUserMessage(chat, request.content());
-        String reply = openRouterClient.complete(chat.getChatMessages());
+        String reply = ollamaClient.complete(chat.getChatMessages());
         recordAssistantMessage(chat, reply);
 
         chatRepository.save(chat);
         return chatMapper.toDto(chat);
     }
+    @Transactional
+    public ChatDto generateDiagram(String chatId, String request) {
 
+        Chat chat = loadChat(chatId);
+
+        String diagram = ollamaClient.generateDiagram(
+                chat.getChatMessages(),
+                request
+        );
+
+        chat.addMessage(
+                ChatMessage.of(
+                        Role.ASSISTANT,
+                        MessageType.MERMAID,
+                        diagram
+                )
+        );
+
+        chatRepository.save(chat);
+
+        return chatMapper.toDto(chat);
+    }
     private void recordUserMessage(Chat chat, String content) {
         chat.addMessage(ChatMessage.of(Role.USER, content));
         if (ChatTitles.isPlaceholder(chat.getTitle())) {
@@ -88,4 +110,5 @@ public class ChatService {
         return chatRepository.findWithMessagesById(chatId)
                 .orElseThrow(() -> new ChatNotFoundException(chatId));
     }
+
 }

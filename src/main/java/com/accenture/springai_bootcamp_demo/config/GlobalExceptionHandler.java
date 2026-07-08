@@ -1,6 +1,6 @@
 package com.accenture.springai_bootcamp_demo.config;
 
-import com.accenture.springai_bootcamp_demo.client.OpenRouterException;
+import com.accenture.springai_bootcamp_demo.client.LlmException;
 import com.accenture.springai_bootcamp_demo.service.ChatNotFoundException;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -27,9 +27,8 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
     }
-
-    @ExceptionHandler(OpenRouterException.class)
-    public ProblemDetail handleOpenRouter(OpenRouterException ex) {
+    @ExceptionHandler(LlmException.class)
+    public ProblemDetail handleLlm(LlmException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, ex.getMessage());
     }
 }

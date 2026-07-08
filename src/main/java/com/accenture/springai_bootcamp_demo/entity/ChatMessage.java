@@ -1,16 +1,6 @@
 package com.accenture.springai_bootcamp_demo.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -38,6 +28,10 @@ public class ChatMessage {
     @Column(nullable = false)
     private Role role;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(255) default 'TEXT'")
+    private MessageType type;
+
     @Column(nullable = false, length = 8000)
     private String content;
 
@@ -45,8 +39,13 @@ public class ChatMessage {
     private Instant createdAt;
 
     public static ChatMessage of(Role role, String content) {
+        return of(role, MessageType.TEXT, content);
+    }
+
+    public static ChatMessage of(Role role, MessageType type, String content) {
         ChatMessage chatMessage = new ChatMessage();
         chatMessage.role = role;
+        chatMessage.type = type;
         chatMessage.content = content;
         chatMessage.createdAt = Instant.now();
         return chatMessage;
