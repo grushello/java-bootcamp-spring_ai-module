@@ -6,5 +6,7 @@ package com.accenture.springai_bootcamp_demo.entity;
 public enum Role {
     SYSTEM,
     USER,
-    ASSISTANT
+    ASSISTANT,
+    LLM_A,
+    LLM_B
 }

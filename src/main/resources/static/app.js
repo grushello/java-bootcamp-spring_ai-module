@@ -26,7 +26,11 @@ const api = {
             throw new Error(problem.detail || "Request failed");
         }
         return r.json();
-    })
+    }),
+    llmNext: (chatId) =>
+        fetch(`/api/chats/${chatId}/llm-next`, {
+            method: "POST"
+        }).then(r => r.json())
 };
 
 const els = {
@@ -38,7 +42,9 @@ const els = {
     form: document.getElementById('composer'),
     error: document.getElementById('error'),
     newChat: document.getElementById('new-chat'),
-    diagramButton: document.getElementById('diagram-btn')
+    diagramButton: document.getElementById('diagram-btn'),
+    llmNextButton: document.getElementById('llm-next-btn')
+
 };
 
 let activeChatId = null;
@@ -52,10 +58,24 @@ function setError(message) {
     els.error.textContent = message || '';
 }
 
-function setComposerEnabled(enabled) {
+function setComposerEnabled(enabled, chat = null) {
     els.input.disabled = !enabled;
     els.send.disabled = !enabled;
     els.diagramButton.disabled = !enabled;
+
+    // Normal messages are not allowed in LLM debate chats
+    if (chat && chat.type === "LLM_DEBATE") {
+        els.input.disabled = true;
+        els.send.disabled = true;
+        els.input.placeholder = "LLM debate mode - use 'Next response'";
+    } else {
+        els.input.placeholder = "";
+    }
+}
+function setLlmButtonEnabled(chat) {
+    if (!els.llmNextButton) return;
+
+    els.llmNextButton.disabled = chat.type !== "LLM_DEBATE";
 }
 
 async function refreshChatList() {
@@ -137,28 +157,85 @@ function renderMessage(message) {
 async function openChat(id) {
     setError('');
     activeChatId = id;
+
     const chat = await api.get(id);
+
     renderMessages(chat);
-    setComposerEnabled(true);
+
+    setComposerEnabled(true, chat);
+    setLlmButtonEnabled(chat);
+
     els.input.focus();
+
     await refreshChatList();
 }
 
 async function startNewChat() {
     setError('');
+
     const chat = await api.create();
+
     await refreshChatList();
     await openChat(chat.id);
 }
+document
+    .getElementById("llmChatButton")
+    .addEventListener("click", startLlmChat);
 
+async function startLlmChat() {
+
+    const response = await fetch("/api/chats/llm-chat", {
+        method: "POST"
+    });
+
+    if (!response.ok) {
+        console.error("Failed to start LLM chat");
+        return;
+    }
+
+    const chat = await response.json();
+
+    await refreshChatList();
+
+    await openChat(chat.id);
+}
+async function continueLlmChat() {
+
+    if (!activeChatId) {
+        setError("No chat selected");
+        return;
+    }
+
+    try {
+        els.llmNextButton.disabled = true;
+
+        const chat = await api.llmNext(activeChatId);
+
+        renderMessages(chat);
+        await refreshChatList();
+
+    } catch (err) {
+        setError(err.message);
+    } finally {
+        els.llmNextButton.disabled = false;
+    }
+}
 async function deleteChat(id) {
     setError('');
     await api.remove(id);
     if (id === activeChatId) {
         activeChatId = null;
+
         els.title.textContent = 'Select or start a chat';
         els.messages.innerHTML = '<div class="empty">No conversation selected.</div>';
+
         setComposerEnabled(false);
+
+        if (els.llmNextButton) {
+            els.llmNextButton.disabled = true;
+        }
+
+        els.input.placeholder = "";
     }
     await refreshChatList();
 }
@@ -223,6 +300,7 @@ async function generateDiagram() {
 }
 
 els.newChat.onclick = startNewChat;
+els.llmNextButton.onclick = continueLlmChat;
 
 els.form.addEventListener('submit', (e) => {
     e.preventDefault();

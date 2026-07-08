@@ -1,12 +1,7 @@
 package com.accenture.springai_bootcamp_demo.entity;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +27,10 @@ public class Chat {
     @Column(nullable = false)
     private String title;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ChatType type;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -45,10 +44,19 @@ public class Chat {
     public static Chat create(String title) {
         Chat chat = new Chat();
         Instant now = Instant.now();
+
         chat.id = UUID.randomUUID().toString();
         chat.title = title;
+        chat.type = ChatType.NORMAL;
         chat.createdAt = now;
         chat.updatedAt = now;
+
+        return chat;
+    }
+
+    public static Chat createLlmDebate() {
+        Chat chat = create("LLM vs LLM");
+        chat.type = ChatType.LLM_DEBATE;
         return chat;
     }
 

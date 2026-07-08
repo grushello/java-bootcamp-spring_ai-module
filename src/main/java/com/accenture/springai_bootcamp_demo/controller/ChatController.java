@@ -62,4 +62,12 @@ public class ChatController {
 
         return chatService.generateDiagram(chatId, request);
     }
+    @PostMapping("/llm-chat")
+    public ChatDto startLlmChat() {
+        return chatService.startLlmChat();
+    }
+    @PostMapping("/{chatId}/llm-next")
+    public ChatDto continueLlm(@PathVariable String chatId) {
+        return chatService.continueLlmChat(chatId);
+    }
 }
