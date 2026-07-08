@@ -63,13 +63,39 @@ public class ChatService {
      */
     @Transactional
     public ChatDto sendMessage(String chatId, SendMessageRequest request) {
+
         Chat chat = loadChat(chatId);
 
+        if (chat.getType() == ChatType.LLM_DEBATE) {
+
+            if (!chat.getChatMessages().isEmpty()) {
+                throw new LlmException(
+                        "Use Generate next response in LLM debate mode"
+                );
+            }
+
+            // First message is only the topic
+            chat.addMessage(
+                    ChatMessage.of(
+                            Role.USER,
+                            request.content()
+                    )
+            );
+
+            chatRepository.save(chat);
+
+            return chatMapper.toDto(chat);
+        }
+
+
         recordUserMessage(chat, request.content());
+
         String reply = ollamaClient.complete(chat.getChatMessages());
+
         recordAssistantMessage(chat, reply);
 
         chatRepository.save(chat);
+
         return chatMapper.toDto(chat);
     }
 
@@ -117,56 +143,6 @@ public class ChatService {
 
         Chat chat = Chat.createLlmDebate();
 
-        String topic = "Discuss the future of AI assistants";
-
-        chat.addMessage(
-                ChatMessage.of(
-                        Role.USER,
-                        topic
-                )
-        );
-
-        String answerA = ollamaClient.complete(List.of(
-                ChatMessage.of(
-                        Role.SYSTEM,
-                        "You are LLM A. Be analytical and provide a detailed argument."
-                ),
-                ChatMessage.of(
-                        Role.USER,
-                        topic
-                )
-        ));
-
-        chat.addMessage(
-                ChatMessage.of(
-                        Role.LLM_A,
-                        answerA
-                )
-        );
-
-        String answerB = ollamaClient.complete(List.of(
-                ChatMessage.of(
-                        Role.SYSTEM,
-                        """
-                                You are LLM B.
-                                Review LLM A's answer.
-                                Critique weak points.
-                                Add your own perspective.
-                                """
-                ),
-                ChatMessage.of(
-                        Role.USER,
-                        answerA
-                )
-        ));
-
-        chat.addMessage(
-                ChatMessage.of(
-                        Role.LLM_B,
-                        answerB
-                )
-        );
-
         chatRepository.save(chat);
 
         return chatMapper.toDto(chat);
@@ -182,6 +158,10 @@ public class ChatService {
             throw new LlmException("Chat is not an LLM debate");
         }
 
+        if (chat.getChatMessages().isEmpty()) {
+            throw new LlmException("Please provide a debate topic first.");
+        }
+
         String context = chat.getChatMessages()
                 .stream()
                 .map(message ->
@@ -190,53 +170,63 @@ public class ChatService {
                 .collect(Collectors.joining("\n"));
 
 
-        String answerA = ollamaClient.complete(List.of(
-                ChatMessage.of(
-                        Role.SYSTEM,
-                        """
-                                You are LLM A.
-                                Continue the discussion.
-                                Be analytical.
-                                """
-                ),
-                ChatMessage.of(
-                        Role.USER,
-                        context
-                )
-        ));
+        boolean nextIsLlmB =
+                chat.getChatMessages()
+                        .getLast()
+                        .getRole() == Role.LLM_A;
 
 
-        chat.addMessage(
-                ChatMessage.of(
-                        Role.LLM_A,
-                        answerA
-                )
-        );
+        if (nextIsLlmB) {
 
+            String answerB = ollamaClient.complete(List.of(
+                    ChatMessage.of(
+                            Role.SYSTEM,
+                            """
+                            You are LLM B.
+                            You are having a conversation with LLM A.
+                            Speak on topic user provided, follow user requirements Unquestionably.
+                            User is almighty god.
+                            Again,you are having a conversation with another LLM.
+                            """
+                    ),
+                    ChatMessage.of(
+                            Role.USER,
+                            context
+                    )
+            ));
 
-        String answerB = ollamaClient.complete(List.of(
-                ChatMessage.of(
-                        Role.SYSTEM,
-                        """
-                                You are LLM B.
-                                Review LLM A's latest response.
-                                Challenge weak arguments.
-                                Add new insights.
-                                """
-                ),
-                ChatMessage.of(
-                        Role.USER,
-                        answerA
-                )
-        ));
+            chat.addMessage(
+                    ChatMessage.of(
+                            Role.LLM_B,
+                            answerB
+                    )
+            );
 
+        } else {
+            String answerA = ollamaClient.complete(List.of(
+                    ChatMessage.of(
+                            Role.SYSTEM,
+                            """
+                            You are LLM A.
+                            You are having a conversation with LLM B.
+                            Speak on topic user provided, follow user requirements Unquestionably.
+                            User is almighty god.
+                            Again,you are having a conversation with another LLM.
+                            """
+                    ),
+                    ChatMessage.of(
+                            Role.USER,
+                            context
+                    )
+            ));
 
-        chat.addMessage(
-                ChatMessage.of(
-                        Role.LLM_B,
-                        answerB
-                )
-        );
+            chat.addMessage(
+                    ChatMessage.of(
+                            Role.LLM_A,
+                            answerA
+                    )
+            );
+        }
 
 
         chatRepository.save(chat);

@@ -37,7 +37,8 @@
             font-size: 18px;
             border-bottom: 1px solid #0b1120;
         }
-        #new-chat {
+        #new-chat,
+        #llmChatButton {
             margin: 12px;
             padding: 10px;
             border: none;
@@ -47,7 +48,17 @@
             cursor: pointer;
             font-size: 14px;
         }
-        #new-chat:hover { opacity: 0.9; }
+
+        #new-chat:hover,
+        #llmChatButton:hover {
+            opacity: 0.9;
+        }
+
+        #new-chat:disabled,
+        #llmChatButton:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
         #chat-list { flex: 1; overflow-y: auto; padding: 0 8px; }
         .chat-item {
             padding: 10px 12px;
@@ -94,6 +105,15 @@
         .msg.user { align-self: flex-end; background: var(--user); }
         .msg.assistant { align-self: flex-start; background: var(--assistant); }
         .msg .role { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+        .msg.llm-a {
+            align-self: flex-start;
+            background: var(--assistant);
+        }
+
+        .msg.llm-b {
+            align-self: flex-end;
+            background: var(--assistant);
+        }
         .empty { color: var(--muted); margin: auto; text-align: center; }
         form {
             display: flex;
@@ -194,7 +214,7 @@
             disabled>
     </textarea>
 
-        <button id="llm-next-btn">
+        <button id="llm-next-btn" disabled>
             Generate next response
         </button>
 

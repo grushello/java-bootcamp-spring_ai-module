@@ -63,19 +63,41 @@ function setComposerEnabled(enabled, chat = null) {
     els.send.disabled = !enabled;
     els.diagramButton.disabled = !enabled;
 
-    // Normal messages are not allowed in LLM debate chats
     if (chat && chat.type === "LLM_DEBATE") {
-        els.input.disabled = true;
+
+        const hasTopic = chat.chatMessages.length > 0;
+
+        // LLM chats use only "Generate next response"
         els.send.disabled = true;
-        els.input.placeholder = "LLM debate mode - use 'Next response'";
+        els.diagramButton.disabled = true;
+
+        // Allow typing only until topic is entered
+        els.input.disabled = hasTopic;
+
+        els.input.placeholder = hasTopic
+            ? "Topic selected - use 'Generate next response'"
+            : "Enter debate topic...";
+
     } else {
-        els.input.placeholder = "";
+        els.input.placeholder = "Type a message and press Enter...";
     }
 }
 function setLlmButtonEnabled(chat) {
     if (!els.llmNextButton) return;
 
-    els.llmNextButton.disabled = chat.type !== "LLM_DEBATE";
+    if (chat.type !== "LLM_DEBATE") {
+        els.llmNextButton.disabled = true;
+        return;
+    }
+
+    // If topic already exists, allow generating next response
+    if (chat.chatMessages.length > 0) {
+        els.llmNextButton.disabled = false;
+        return;
+    }
+
+    // First message requires user to type a topic
+    els.llmNextButton.disabled = els.input.value.trim().length === 0;
 }
 
 async function refreshChatList() {
@@ -115,7 +137,7 @@ function renderMessages(chat) {
     els.title.textContent = chat.title;
     els.messages.innerHTML = '';
     if (!chat.chatMessages.length) {
-        els.messages.innerHTML = '<div class="empty">Say hello to start the conversation.</div>';
+        els.messages.innerHTML = '<div class="empty">Write a message to start the conversation.</div>';
         return;
     }
     chat.chatMessages.forEach(m => els.messages.appendChild(renderMessage(m)));
@@ -126,7 +148,14 @@ function renderMessage(message) {
     console.log("Rendering", message);
 
     const wrapper = document.createElement("div");
-    wrapper.className = `msg ${message.role.toLowerCase()}`;
+    const roleMap = {
+        USER: "user",
+        ASSISTANT: "assistant",
+        LLM_A: "llm-a",
+        LLM_B: "llm-b"
+    };
+
+    wrapper.className = `msg ${roleMap[message.role] || "assistant"}`;
 
     const role = document.createElement("div");
     role.className = "role";
@@ -209,9 +238,32 @@ async function continueLlmChat() {
     try {
         els.llmNextButton.disabled = true;
 
+        const currentChat = await api.get(activeChatId);
+
+        // First call: save the topic from input
+        if (currentChat.chatMessages.length === 0) {
+
+            const topic = els.input.value.trim();
+
+            if (!topic) {
+                setError("Enter a debate topic first");
+                return;
+            }
+
+            await api.send(activeChatId, topic);
+
+            els.input.value = '';
+        }
+
+        // Generate LLM_A and LLM_B
         const chat = await api.llmNext(activeChatId);
 
         renderMessages(chat);
+
+        setComposerEnabled(true, chat);
+
+        setLlmButtonEnabled(chat);
+
         await refreshChatList();
 
     } catch (err) {
@@ -277,6 +329,13 @@ function appendPending(content) {
 
 async function generateDiagram() {
 
+    const chat = await api.get(activeChatId);
+
+    if (chat.type === "LLM_DEBATE") {
+        setError("Diagrams are not available in LLM debate mode");
+        return;
+    }
+
     const text = els.input.value.trim();
 
     if (!text) {
@@ -287,9 +346,9 @@ async function generateDiagram() {
     try {
         els.diagramButton.disabled = true;
 
-        const chat = await api.diagram(activeChatId, text);
+        const updatedChat = await api.diagram(activeChatId, text);
 
-        renderMessages(chat);
+        renderMessages(updatedChat);
         await refreshChatList();
 
     } catch (err) {
@@ -302,17 +361,54 @@ async function generateDiagram() {
 els.newChat.onclick = startNewChat;
 els.llmNextButton.onclick = continueLlmChat;
 
-els.form.addEventListener('submit', (e) => {
+els.form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    if (!activeChatId) return;
+
+    const chat = await api.get(activeChatId);
+
+    if (chat.type === "LLM_DEBATE") {
+        return;
+    }
+
     const content = els.input.value.trim();
-    if (!content || !activeChatId) return;
+
+    if (!content) return;
+
     els.input.value = '';
     submitMessage(content);
 });
+els.input.addEventListener('input', async () => {
+    if (!activeChatId) return;
 
-els.input.addEventListener('keydown', (e) => {
+    const chat = await api.get(activeChatId);
+
+    if (chat.type === "LLM_DEBATE") {
+
+        // Once topic exists, input stays disabled
+        if (chat.chatMessages.length > 0) {
+            els.input.disabled = true;
+            els.llmNextButton.disabled = false;
+            return;
+        }
+
+        const hasTopic = els.input.value.trim().length > 0;
+        els.llmNextButton.disabled = !hasTopic;
+    }
+});
+
+els.input.addEventListener('keydown', async (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
+
         e.preventDefault();
+
+        const chat = await api.get(activeChatId);
+
+        if (chat.type === "LLM_DEBATE") {
+            return; // do nothing, Generate next response handles it
+        }
+
         els.form.requestSubmit();
     }
 });

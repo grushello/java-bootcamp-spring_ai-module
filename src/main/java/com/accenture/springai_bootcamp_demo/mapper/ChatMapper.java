@@ -6,11 +6,13 @@ import com.accenture.springai_bootcamp_demo.entity.Chat;
 import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.NullValueMappingStrategy;
 
 /**
  * Maps {@link Chat} aggregates to full and summary API representations.
  */
-@Mapper(componentModel = "spring", uses = MessageMapper.class)
+@Mapper(componentModel = "spring", uses = MessageMapper.class,
+        nullValueIterableMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT)
 public interface ChatMapper {
 
     ChatDto toDto(Chat chat);
